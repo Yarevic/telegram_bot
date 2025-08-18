@@ -108,9 +108,17 @@ grammar_exercise = [
 ]
 
 
-q_data = random.choice(grammar_exercise)  # Zufällige Frage wählen
-print(q_data["sentence"])
-print(q_data["options"][:3])
+# Hilfsfunktion, die eine zufällige Frage sendet
+async def send_random_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = random.choice(grammar_exercise)
+    context.user_data["current_q"] = q
+    opts = q["options"][:]   # Kopie der Optionen
+    random.shuffle(opts)     # mischen für Abwechslung
+    kb = ReplyKeyboardMarkup([opts, ["Back"]], resize_keyboard=True)
+    await update.message.reply_text(q["sentence"], reply_markup=kb)
+    
+    print(q["sentence"])
+    print(q["options"][:3])
 
 async def start(update:Update, context:ContextTypes.DEFAULT_TYPE):
     #Asynchrone Startfunktion, wird aufgerufen, wenn der User /start sendet.
@@ -149,19 +157,18 @@ async def handle_message(update:Update, context:ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Choose your actions", reply_markup=reply_markup_exercise)
 
     elif text == "Grammar":
+        await send_random_question(update, context)
         
-        options_keyboard = [[q_data["options"][0], q_data["options"][1], q_data["options"][2]],["Back"]] #срез списка в три элемента , [q_data["options"][2:]]
-        options_reply_markup = ReplyKeyboardMarkup(options_keyboard, resize_keyboard=True)
-        await update.message.reply_text(q_data["sentence"], reply_markup=options_reply_markup)
-        
-    elif text == q_data["correct"]:
-        options_keyboard = [[q_data["options"][0], q_data["options"][1], q_data["options"][2]],["Back"]] #срез списка в три элемента , [q_data["options"][2:]]
-        options_reply_markup = ReplyKeyboardMarkup(options_keyboard, resize_keyboard=True)
-        await update.message.reply_text("Richtig! Weiter so...", reply_markup=options_reply_markup)
-    elif text != q_data["correct"]:
-        options_keyboard = [[q_data["options"][0], q_data["options"][1], q_data["options"][2]],["Back"]] #срез списка в три элемента , [q_data["options"][2:]]
-        options_reply_markup = ReplyKeyboardMarkup(options_keyboard, resize_keyboard=True)
-        await update.message.reply_text("Falsch! Nochmal probieren...", reply_markup=options_reply_markup)        
+    elif context.user_data.get("current_q"):
+        q = context.user_data["current_q"]
+        if text == q["correct"]:
+            await update.message.reply_text("✅ Richtig! Weiter so...")
+            await send_random_question(update, context)  # nächste Frage
+        elif text in q["options"]:
+            await update.message.reply_text("❌ Falsch. Versuch’s nochmal.")
+
+    else:
+        await update.message.reply_text("Ich habe dich nicht verstanden. Wähle bitte eine Option.")        
         
         
 
